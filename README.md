@@ -1,7 +1,6 @@
-# redis-flake
-S# Redis Flake
+# Redis Flake
 
-A simple Nix flake that builds Redis from GitHub sources.
+A simple Nix flake that builds Redis from GitHub or local sources.
 
 ## Features
 
