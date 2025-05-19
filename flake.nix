@@ -56,9 +56,16 @@
       let
         pkgs = import nixpkgs { inherit system; };
 
+        # Extract the Redis version from source code
+        redisVersion = let
+          versionFile = builtins.readFile "${redis}/src/version.h";
+          versionMatch = builtins.match ".*#define REDIS_VERSION \"([0-9]+\\.[0-9]+\\.[0-9]+)\".*" versionFile;
+        in if versionMatch != null then builtins.elemAt versionMatch 0 else "unknown";
+
         # Create a customized Redis package
         customRedis = pkgs.redis.overrideAttrs (oldAttrs: {
           src = redis;
+          version = redisVersion;
 
           # Don't run the tests because unstable might fail
           doCheck = false;
