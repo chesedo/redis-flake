@@ -69,6 +69,9 @@
 
           # Don't run the tests because unstable might fail
           doCheck = false;
+
+          # Add zlib to buildInputs for compilation
+          buildInputs = (oldAttrs.buildInputs or []) ++ [ pkgs.zlib ];
         });
       in {
         packages = {
