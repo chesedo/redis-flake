@@ -72,6 +72,11 @@
 
           # Add zlib to buildInputs for compilation
           buildInputs = (oldAttrs.buildInputs or []) ++ [ pkgs.zlib ];
+
+          # Add preInstall to create the lib directory
+          preInstall = ''
+            mkdir -p $out/lib
+          '';
         });
       in {
         packages = {
