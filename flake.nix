@@ -46,12 +46,25 @@
     # - For specific commit: "github:redis/redis/abcdef123456789"
     # - For local source: use inputs.redis.url = "/path/to/local/redis";
     redis = {
-      url = "github:redis/redis/unstable";
+      url = "git+ssh://git@github.com/redislabsdev/Redis.git?ref=rl_big2_8.0";
+      flake = false;
+    };
+
+    # SPEEDB DEPENDENCY:
+    # This Redis Labs fork requires speedb (a RocksDB fork) as a submodule dependency
+    # for its block storage drivers (bs_speedb.so). The Makefile expects speedb to be
+    # in ../speedb/ relative to the src/ directory. We fetch it as a separate flake input
+    # instead of using git submodules because:
+    # 1. Nix flake inputs don't preserve git submodule information
+    # 2. This approach gives us more control over the speedb version
+    # 3. We can copy speedb to a writable location during the build
+    speedb = {
+      url = "git+ssh://git@github.com/redislabsdev/speedb-ent";
       flake = false;
     };
   };
 
-  outputs = { self, nixpkgs, flake-utils, redis }:
+  outputs = { self, nixpkgs, flake-utils, redis, speedb }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
@@ -63,6 +76,8 @@
         in if versionMatch != null then builtins.elemAt versionMatch 0 else "unknown";
 
         # Create a customized Redis package
+        # This Redis Labs fork (rl_big2_8.0 branch) has custom block storage drivers
+        # (bs_dummy.so and bs_speedb.so) that require special build configuration
         customRedis = pkgs.redis.overrideAttrs (oldAttrs: {
           src = redis;
           version = redisVersion;
@@ -70,12 +85,62 @@
           # Don't run the tests because unstable might fail
           doCheck = false;
 
-          # Add zlib to buildInputs for compilation
+          # DEPENDENCY: zlib
+          # Required for compilation of this Redis fork
           buildInputs = (oldAttrs.buildInputs or []) ++ [ pkgs.zlib ];
 
-          # Add preInstall to create the lib directory
+          # BUILD TOOLS:
+          # - cmake: Required to build the speedb dependency (a RocksDB fork)
+          # - makeBinaryWrapper: Needed to wrap binaries with LD_LIBRARY_PATH in postInstall
+          nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [ pkgs.cmake pkgs.makeWrapper ];
+
+          # CMAKE CONFIGURATION:
+          # Disable cmake's automatic configure phase because Redis itself uses Make, not CMake.
+          # We only need cmake available in PATH to build the speedb submodule dependency.
+          # Without this flag, Nix would try to run cmake on the Redis source and fail.
+          dontUseCmakeConfigure = true;
+
+          # COMPILER FLAGS:
+          # The speedb (RocksDB fork) source has format-truncation warnings that are treated
+          # as errors with -Werror. We downgrade these to warnings to allow the build to succeed.
+          # Specific error: /speedb/util/string_util.cc:121:32: error: '%li' directive output 
+          # may be truncated writing between 1 and 20 bytes into a region of size 19
+          NIX_CFLAGS_COMPILE = (oldAttrs.NIX_CFLAGS_COMPILE or "") + " -Wno-error=format-truncation";
+
+          # SPEEDB DEPENDENCY SETUP:
+          # The Redis Labs Makefile expects speedb to be in ../speedb (relative to src/).
+          # We need to copy (not symlink) speedb because:
+          # 1. The build process needs to create speedb/build/ directory for cmake output
+          # 2. Nix store paths are read-only, so we can't create directories in a symlink target
+          # 3. chmod -R u+w is needed because files copied from Nix store are read-only by default
+          preBuild = ''
+            # Create speedb directory and link the speedb source
+            rm -rf speedb/
+            cp -r ${speedb} speedb
+            chmod -R u+w speedb
+          '';
+
+          # LIBRARY DIRECTORY CREATION:
+          # The Redis Labs Makefile installs block storage driver .so files to $PREFIX/lib/
+          # via this loop in the Makefile (line 666):
+          #   for driver in $(BIGSTORE_LIBS:.so=); do 
+          #     install $$driver.so $(REDIS_INSTALL_LIBRARY_PATH)/$$driver$(BIN_SUFFIX).so
+          #   done
+          # Where BIGSTORE_LIBS = bs_dummy.so bs_speedb.so
+          # The lib directory doesn't exist by default, causing install to fail with:
+          # "cannot create regular file '/nix/store/.../lib/bs_dummy.so': No such file or directory"
           preInstall = ''
             mkdir -p $out/lib
+          '';
+
+          # LD_LIBRARY_PATH CONFIGURATION:
+          # The block storage driver .so files are installed to $out/lib and need to be
+          # found at runtime by the Redis binaries. We wrap each binary to add $out/lib
+          # to LD_LIBRARY_PATH so the dynamic linker can find bs_dummy.so and bs_speedb.so.
+          postInstall = ''
+            for bin in $out/bin/*; do
+              wrapProgram $bin --prefix LD_LIBRARY_PATH : $out/lib
+            done
           '';
         });
       in {
