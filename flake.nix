@@ -92,7 +92,7 @@
           # BUILD TOOLS:
           # - cmake: Required to build the speedb dependency (a RocksDB fork)
           # - makeBinaryWrapper: Needed to wrap binaries with LD_LIBRARY_PATH in postInstall
-          nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [ pkgs.cmake pkgs.makeWrapper ];
+          nativeBuildInputs = (oldAttrs.nativeBuildInputs or []) ++ [ pkgs.cmake pkgs.makeBinaryWrapper ];
 
           # CMAKE CONFIGURATION:
           # Disable cmake's automatic configure phase because Redis itself uses Make, not CMake.
