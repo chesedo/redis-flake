@@ -46,7 +46,7 @@
     # - For specific commit: "github:redis/redis/abcdef123456789"
     # - For local source: use inputs.redis.url = "/path/to/local/redis";
     redis = {
-      url = "git+ssh://git@github.com/redislabsdev/Redis.git?ref=rl_big2_8.0";
+      url = "git+ssh://git@github.com/redislabsdev/Redis.git?ref=rl_big2_8.4";
       flake = false;
     };
 
@@ -100,13 +100,6 @@
           # Without this flag, Nix would try to run cmake on the Redis source and fail.
           dontUseCmakeConfigure = true;
 
-          # COMPILER FLAGS:
-          # The speedb (RocksDB fork) source has format-truncation warnings that are treated
-          # as errors with -Werror. We downgrade these to warnings to allow the build to succeed.
-          # Specific error: /speedb/util/string_util.cc:121:32: error: '%li' directive output 
-          # may be truncated writing between 1 and 20 bytes into a region of size 19
-          NIX_CFLAGS_COMPILE = (oldAttrs.NIX_CFLAGS_COMPILE or "") + " -Wno-error=format-truncation";
-
           # SPEEDB DEPENDENCY SETUP:
           # The Redis Labs Makefile expects speedb to be in ../speedb (relative to src/).
           # We need to copy (not symlink) speedb because:
@@ -118,6 +111,11 @@
             rm -rf speedb/
             cp -r ${speedb} speedb
             chmod -R u+w speedb
+
+            # Patch speedb header to include cstdint
+            # This is only temporarily needed until the speedb source is fixed upstream
+            sed -i '1i #include <cstdint>' speedb/db/blob/blob_file_meta.h
+            sed -i '1i #include <cstdint>' speedb/include/rocksdb/trace_record.h
           '';
 
           # LIBRARY DIRECTORY CREATION:

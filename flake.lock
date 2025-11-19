@@ -37,16 +37,16 @@
     "redis": {
       "flake": false,
       "locked": {
-        "lastModified": 1757258012,
-        "narHash": "sha256-BKlBd8OPpTAPFuBMywsPDWXASVOsKoKD+gV3WKikU3M=",
-        "ref": "rl_big2_8.0",
-        "rev": "63e724eec84e96a9634831d395241859ecef8e29",
-        "revCount": 19888,
+        "lastModified": 1769950867,
+        "narHash": "sha256-/tsGjCbA8C30GVElJ0J4fYP4cwMyr/1eLeVKI063MYA=",
+        "ref": "rl_big2_8.4",
+        "rev": "c0bc90647a418c0ef466a75aac3eeb2026e2456a",
+        "revCount": 20405,
         "type": "git",
         "url": "ssh://git@github.com/redislabsdev/Redis.git"
       },
       "original": {
-        "ref": "rl_big2_8.0",
+        "ref": "rl_big2_8.4",
         "type": "git",
         "url": "ssh://git@github.com/redislabsdev/Redis.git"
       }
